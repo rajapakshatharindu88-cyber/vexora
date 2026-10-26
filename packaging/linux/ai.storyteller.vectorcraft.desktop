@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=VectorCraft
+Name=VEXORA [by Grafio.]
 GenericName=Vector Graphics Editor
-Comment=Draw and edit vector illustrations, SVG and PDF
+Comment=Vector design and print-production editor (VEXORA baseline build)
 Exec=vectorcraft %F
 TryExec=vectorcraft
 Icon=ai.storyteller.vectorcraft

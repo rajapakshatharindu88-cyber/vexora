@@ -1,0 +1,251 @@
+# VEXORA baseline build: Linux x86_64 AppImage + ZIP, built from source on a GitHub-hosted runner.
+#
+# Honest by design: each stage records its real outcome; a failing stage is never hidden; artifacts
+# are uploaded even when a later stage fails (logs always); the run ends RED if anything failed.
+# Run it by hand: repo > Actions > "VEXORA build (Linux x86_64)" > Run workflow.
+name: VEXORA build (Linux x86_64)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_tests:
+        description: "Run the baseline test suite (slow). Untick to build and package only."
+        type: boolean
+        default: true
+      runner:
+        description: "Runner image. Older image = AppImage runs on older distributions (needs glibc >= the image's)."
+        type: choice
+        options: [ubuntu-24.04, ubuntu-22.04]
+        default: ubuntu-24.04
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vexora-build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUST_VERSION: "1.97.0"        # workspace needs >= 1.95; pinned so every run uses the same compiler
+  CARGO_TERM_COLOR: never
+  CARGO_INCREMENTAL: "0"
+  RUST_BACKTRACE: "1"
+  VECTORCRAFT_BUILD_SHA: ${{ github.sha }}
+
+jobs:
+  build:
+    name: Build, test, package
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04' }}
+    timeout-minutes: 350
+    env:
+      CI_OUT: ${{ github.workspace }}/ci-out
+      DIST: ${{ github.workspace }}/ci-out/dist
+      RUN_TESTS: ${{ inputs.run_tests == false && 'false' || 'true' }}
+      RUNNER_IMAGE: ${{ inputs.runner || 'ubuntu-24.04' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Prepare output folders and record the environment
+        run: |
+          mkdir -p "$CI_OUT/logs" "$DIST"
+          { uname -a; cat /etc/os-release; ldd --version | head -n1; df -h /; nproc; free -g; } | tee "$CI_OUT/logs/00-environment.log"
+
+      - name: Guard - logos unchanged and no ArtCraft logos
+        run: bash scripts/ci/check_branding.sh 2>&1 | tee "$CI_OUT/logs/00-branding-check.log"
+
+      - name: Free disk space (Rust release + test builds are large)
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /opt/hostedtoolcache/CodeQL || true
+          df -h /
+
+      - name: Install Linux build dependencies
+        run: |
+          set -o pipefail
+          {
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends \
+              pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcb1-dev libxcursor-dev \
+              libxrandr-dev libxi-dev libfontconfig1-dev libfreetype-dev libgl1-mesa-dev \
+              mesa-vulkan-drivers xvfb zip unzip curl ca-certificates desktop-file-utils
+          } 2>&1 | tee "$CI_OUT/logs/00-apt.log"
+
+      - name: Install pinned Rust toolchain
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$RUST_VERSION" --profile minimal
+          rustup default "$RUST_VERSION"
+          rustc --version --verbose | tee "$CI_OUT/logs/00-rustc.log"
+          cargo --version | tee -a "$CI_OUT/logs/00-rustc.log"
+
+      - name: Restore cargo registry/git cache
+        id: cache-cargo
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: vexora-cargo-${{ hashFiles('Cargo.lock') }}
+          restore-keys: vexora-cargo-
+
+      - name: Restore release build cache
+        id: cache-target
+        uses: actions/cache/restore@v4
+        with:
+          path: target
+          key: vexora-target-${{ env.RUNNER_IMAGE }}-rust${{ env.RUST_VERSION }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: vexora-target-${{ env.RUNNER_IMAGE }}-rust${{ env.RUST_VERSION }}-
+
+      - name: Fetch dependencies (locked)
+        id: fetch
+        timeout-minutes: 20
+        run: |
+          set -o pipefail
+          cargo fetch --locked 2>&1 | tee "$CI_OUT/logs/01-fetch.log"
+
+      - name: Save cargo registry/git cache
+        if: steps.fetch.outcome == 'success' && steps.cache-cargo.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: vexora-cargo-${{ hashFiles('Cargo.lock') }}
+
+      - name: Build release binaries (locked)
+        id: build
+        if: steps.fetch.outcome == 'success'
+        timeout-minutes: 200
+        run: |
+          set -o pipefail
+          cargo build --release --locked -p vectorcraft -p vectorcraft-cli 2>&1 | tee "$CI_OUT/logs/02-build.log"
+
+      - name: Save release build cache
+        if: steps.build.outcome == 'success' && steps.cache-target.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: target
+          key: vexora-target-${{ env.RUNNER_IMAGE }}-rust${{ env.RUST_VERSION }}-${{ hashFiles('Cargo.lock') }}
+
+      - name: Run baseline tests
+        id: tests
+        if: steps.build.outcome == 'success' && env.RUN_TESTS == 'true'
+        continue-on-error: true   # a failing test must not stop packaging; it is reported and turns the run red below
+        timeout-minutes: 200
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -o pipefail
+          xvfb-run -a -s "-screen 0 1280x800x24" cargo test --release --locked --no-fail-fast 2>&1 | tee "$CI_OUT/logs/03-test.log"
+
+      - name: Package AppImage and tarball
+        id: package
+        if: steps.build.outcome == 'success'
+        timeout-minutes: 40
+        run: |
+          set -o pipefail
+          # Upstream script: stages the install tree, then builds the AppImage with a pinned,
+          # SHA-256-verified appimagetool and runtime. --skip-build reuses the binaries built above.
+          bash packaging/linux/package.sh --skip-build --formats "appimage tar" 2>&1 | tee "$CI_OUT/logs/04-package.log"
+          V="$(awk '/^\[workspace.package\]/{p=1;next} p&&$1=="version"{gsub(/"/,"",$3);print $3;exit}' Cargo.toml)"
+          test -s "$DIST/vectorcraft-$V-linux-x86_64.AppImage"
+          mv "$DIST/vectorcraft-$V-linux-x86_64.AppImage" "$DIST/VEXORA-baseline-$V-x86_64.AppImage"
+          mv "$DIST/vectorcraft-$V-linux-x86_64.tar.gz"   "$DIST/VEXORA-baseline-$V-linux-x86_64.tar.gz"
+          rm -f "$DIST"/*.zsync
+          echo "VERSION=$V" >> "$GITHUB_ENV"
+
+      - name: AppImage startup checks
+        id: smoke
+        if: steps.package.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 10
+        run: |
+          bash scripts/ci/smoke.sh "$DIST/VEXORA-baseline-$VERSION-x86_64.AppImage" "$CI_OUT/logs" "$GITHUB_WORKSPACE"
+
+      - name: Third-party crate list and source archive
+        id: extras
+        if: steps.package.outcome == 'success'
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 --locked | python3 scripts/ci/thirdparty.py > "$CI_OUT/THIRD_PARTY_CRATES.md"
+          git archive --format=zip --prefix=vexora-source/ -o "$DIST/VEXORA-source-$VERSION.zip" HEAD
+          head -n 8 "$CI_OUT/THIRD_PARTY_CRATES.md"
+
+      - name: Write build report and assemble the ZIP
+        id: report
+        if: always()
+        env:
+          OUT_FETCH: ${{ steps.fetch.outcome }}
+          OUT_BUILD: ${{ steps.build.outcome }}
+          OUT_TESTS: ${{ steps.tests.outcome }}
+          OUT_PACKAGE: ${{ steps.package.outcome }}
+          OUT_SMOKE: ${{ steps.smoke.outcome }}
+          RUNNER: ${{ env.RUNNER_IMAGE }}
+        run: |
+          set -uo pipefail
+          python3 scripts/ci/report.py "$CI_OUT" >/dev/null
+          cat "$CI_OUT/BUILD_REPORT.md" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "${{ steps.package.outcome }}" == "success" ]]; then
+            Z="VEXORA-baseline-$VERSION-linux-x86_64"
+            S="$CI_OUT/zip/$Z"; mkdir -p "$S/logs"
+            cp "$DIST/VEXORA-baseline-$VERSION-x86_64.AppImage" "$S/"
+            cp LICENSE-MIT LICENSE-APACHE NOTICE ASSETS.md "$S/"; cp -R licenses "$S/licenses"
+            cp "$CI_OUT/THIRD_PARTY_CRATES.md" "$CI_OUT/BUILD_REPORT.md" "$S/"
+            cp README.md BUILDING.md "$S/"
+            cp "$CI_OUT"/logs/*.log "$CI_OUT"/logs/*.txt "$S/logs/" 2>/dev/null || true
+            (cd "$CI_OUT/zip" && zip -qr "$DIST/$Z.zip" "$Z")
+            unzip -tq "$DIST/$Z.zip"
+            (cd "$DIST" && sha256sum ./*.AppImage ./*.zip ./*.tar.gz > SHA256SUMS && cat SHA256SUMS)
+            ls -l "$DIST"
+          fi
+
+      - name: Upload ZIP bundle (AppImage + licenses + report + logs)
+        if: steps.package.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEXORA-baseline-zip-tests-${{ steps.tests.outcome == 'success' && 'passed' || (steps.tests.outcome == 'skipped' && 'not-run' || 'FAILED') }}
+          path: |
+            ci-out/dist/*.zip
+            ci-out/dist/SHA256SUMS
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload raw AppImage and source archive
+        if: steps.package.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEXORA-baseline-appimage-and-source
+          path: |
+            ci-out/dist/*.AppImage
+            ci-out/dist/*.tar.gz
+            ci-out/dist/VEXORA-source-*.zip
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload build report and logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: VEXORA-build-logs
+          path: |
+            ci-out/BUILD_REPORT.md
+            ci-out/logs/
+          if-no-files-found: warn
+
+      - name: Final verdict (fails the run if any stage failed)
+        if: always()
+        env:
+          R_FETCH: ${{ steps.fetch.outcome }}
+          R_BUILD: ${{ steps.build.outcome }}
+          R_TESTS: ${{ steps.tests.outcome }}
+          R_PACKAGE: ${{ steps.package.outcome }}
+          R_SMOKE: ${{ steps.smoke.outcome }}
+        run: |
+          echo "fetch=$R_FETCH build=$R_BUILD tests=$R_TESTS package=$R_PACKAGE smoke=$R_SMOKE"
+          bad=0
+          for r in "$R_FETCH" "$R_BUILD" "$R_PACKAGE" "$R_SMOKE"; do [[ "$r" == "success" ]] || bad=1; done
+          if [[ "$RUN_TESTS" == "true" && "$R_TESTS" != "success" ]]; then bad=1; fi
+          if [[ $bad -ne 0 ]]; then echo "::error::At least one stage did not succeed. See BUILD_REPORT.md in the VEXORA-build-logs artifact."; exit 1; fi
+          echo "All stages succeeded."

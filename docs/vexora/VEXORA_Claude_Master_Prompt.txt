@@ -1,0 +1,162 @@
+VEXORA — MASTER SOFTWARE ENGINEERING PROMPT
+Product: VEXORA [by Grafio.]
+Version: 1.0.0
+Date: 2026/10/26
+Creator shown in About: R.M.T.D Rajapaksha, Owner — Grafio.
+
+ROLE
+Act as a senior desktop-application architect, open-source maintainer, UX/UI designer, vector-graphics engineer, test engineer, and Linux packaging specialist. Build VEXORA as a real, runnable, maintainable vector-design application—not just a mockup, landing page, or static UI. Work in small verifiable stages, inspect the existing project before changing it, and never claim a feature works unless it is implemented and tested.
+
+INPUTS AND SOURCE CODE
+I will upload exactly two logo images:
+1. VEXORA logo: use this for the application identity, splash/loading screen where appropriate, About header, and app icon. Preserve the supplied design; do not redraw, stylize, recolor, distort, or replace it. If multiple icon sizes are needed, create correctly sized exports from the supplied image while preserving its appearance and transparency. If the supplied image has a black background, inspect its alpha channel and preserve the intended appearance rather than guessing.
+2. Grafio logo: use only as a small logo in the About dialog/page, preserving its original appearance and proportions. Do not replace it with generated artwork.
+
+The existing file is VectorCraft 0.13.1 Linux x86_64 AppImage, approximately 113 MB. Do NOT require me to upload that large AppImage again. An AppImage is a packaged executable and is not a substitute for the original editable source repository. First identify the upstream VectorCraft source repository and its exact version/release from reliable project metadata. If you have network/repository access, retrieve or clone the source yourself and verify that it matches version 0.13.1. If you do not have access, ask me for the source repository URL or a source-code ZIP only; do not pretend you inspected source code you have not received. Do not decompile, bypass protections, or assume the binary contains the complete source. Respect the upstream license, preserve required notices, and check whether redistribution and derivative works are permitted. Do not copy proprietary Adobe/Corel/Affinity code, assets, branding, or UI artwork.
+
+MAIN GOAL
+Create VEXORA [by Grafio.], a modern, professional, cross-feature vector graphics and print-design desktop application inspired by common workflows found in Illustrator, VectorCraft, Affinity Designer, and CorelDRAW. Learn from their general feature categories, but create original branding and implementation. Prioritize a reliable vector editor and print-production workflow. The interface should feel modern, polished, fast, and professional—not like an AI-generated dashboard mockup.
+
+FIRST PHASE: AUDIT BEFORE CODING
+1. Inspect the complete source tree, framework, build system, dependencies, license, existing functionality, known issues, and current tests.
+2. Build and run the unmodified project first, if possible. Record the exact commands and results.
+3. Create an audit report listing bugs, crashes, unfinished functions, accessibility problems, performance issues, dependency/security concerns, and missing tests. Reproduce bugs before fixing them when possible.
+4. Preserve useful existing functionality. Do not rewrite the whole app without a clear technical reason. Use small commits/patches or clearly separated changes.
+5. Create a feature matrix with columns: feature, current status, implementation plan, dependencies, tests, and limitations.
+6. Give me a concise summary of findings and then continue with implementation without stopping for approval at every small step. Ask a question only when a genuinely blocking choice is needed.
+
+PRODUCT DESIGN AND UX
+- Product name: VEXORA [by Grafio.]
+- Version: 1.0.0
+- Date: 2026/10/26
+- About text must include exactly: “Creator: R.M.T.D Rajapaksha” and “Owner: Grafio.”
+- Place the VEXORA logo in the appropriate application branding locations and use it as the application icon.
+- Place the Grafio logo small in About only, unless needed in legal attribution.
+- Design a refined, modern desktop UI with a dark-neutral workspace, restrained accent color, clear typography, compact toolbars, customizable panels, meaningful icons, useful keyboard shortcuts, and consistent spacing. Avoid excessive gradients, oversized cards, decorative effects, and unnecessary animation.
+- Provide light/dark theme support if the existing framework makes it practical.
+- Include a welcome screen with New Document, Open, Recent Files, Templates, and Learn/Help links.
+- Include status bar, zoom controls, rulers, guides, grids, snapping controls, layers/objects panel, properties panel, color/stroke controls, tooltips, and contextual controls.
+- Provide proper empty states, progress indicators, error messages, unsaved-change warnings, and crash-safe recovery where practical.
+- Do not imitate another product's exact UI, icons, wording, or proprietary visual identity.
+
+CORE VECTOR EDITOR REQUIREMENTS
+Implement and test as many of these as the existing architecture reasonably supports:
+- Create/open/save native editable documents; Save As; autosave/recovery; recent files.
+- Vector objects: rectangles, ellipses, lines, polygons, stars, freehand paths, Bézier pen, node editing, text objects, images, groups, clipping/masking where supported.
+- Select/move/scale/rotate/skew; transform handles; multi-select; align/distribute; duplicate; group/ungroup; lock/hide; reorder; z-order.
+- Fill and stroke: solid colors, opacity, gradients if supported, stroke width, joins/caps, dash patterns, eyedropper if feasible.
+- Layers and object tree; rename, reorder, hide, lock, duplicate, delete.
+- Undo/redo with reliable command history; clipboard copy/paste; keyboard shortcuts; zoom/pan; fit page/selection; rulers/guides/grid/snapping.
+- Text editing with font family/size/weight/alignment/line spacing and text-to-path only if supported by a suitable library.
+- Import/export SVG and PDF; PNG export at specified dimensions/DPI; preserve editability where possible. Clearly report unsupported import features rather than silently losing data.
+- Print/page setup, page sizes, orientation, margins, bleed, multiple pages/artboards if architecture supports them, and color-management considerations for print workflows.
+- Robust handling of large documents, invalid files, missing fonts, broken images, and unsupported SVG/PDF features.
+
+PRINT-PRODUCTION TOOLS — HIGH PRIORITY
+A. Automatic die-line drawer:
+- Allow the user to select one or more objects and create an offset contour/die line with adjustable offset, corner/join style, miter limit, and direction.
+- Support rounded corners and compound shapes where feasible.
+- Set die line to a named spot color such as “CutContour” or a user-defined swatch; provide overprint guidance/settings only if the output library supports it.
+- Keep the die line on a separate named layer and preserve the original artwork.
+- Show a preview before applying; support editing and undo.
+- Handle holes, self-intersections, open paths, and invalid geometry safely; explain limitations.
+- Do not claim industry-standard print readiness without validating the generated PDF/SVG output.
+
+B. Folding-line drawer:
+- Draw straight, dashed, or user-defined fold lines from user-selected points, dimensions, guides, or template rules.
+- Use a dedicated “Fold” layer and configurable spot color/style, separate from cut lines.
+- Provide mountain/valley or fold-direction labels where useful.
+- Keep fold lines editable and exclude them from ordinary artwork export when the user chooses.
+
+C. Packaging and layout helpers:
+- Basic dieline/box templates where feasible, with user-editable width, height, depth, glue flap, bleed, and material thickness parameters.
+- Safe-area, bleed, trim, crop marks, registration marks, and print layout helpers.
+- Dimension/measurement tools with units: mm, cm, inches, and pixels.
+- Warn about unsupported geometry and export limitations.
+
+AUTO-GENERATORS
+1. QR code generator: enter text/URL/contact details, choose error correction and size, preview, insert as vector where possible, and test that the generated QR code decodes. Do not send user data to an online service without explicit consent.
+2. Calendar generator: choose year/month, week start, language/locale if supported, paper size, typography, grid, holidays as optional editable user data, and generate editable vector text/shapes. Do not invent or hardcode public holidays without a selected country/source.
+3. Barcode generator if practical: select a supported symbology, validate input, preview, and export cleanly.
+4. Templates: business cards, flyers, labels, posters, packaging, social posts, and common print sizes. Templates must be editable and clearly labelled with units/bleed.
+5. Batch export and repeat-layout tools where feasible.
+
+AI IMAGE GENERATOR INTEGRATION
+- Add an “AI Image Generator” panel with prompt input, style/aspect-ratio/size options, generation progress, cancel/retry, preview, and insert-to-canvas.
+- Use a provider adapter architecture so different APIs can be added without rewriting the UI.
+- Never hardcode API keys or commit secrets. Store keys using the OS credential store if available, otherwise a clearly documented local configuration method with warnings.
+- Do not silently transmit artwork, prompts, or personal data. Explain which provider receives the prompt and require user consent before sending.
+- If no API key/network is available, keep the rest of VEXORA fully usable and show a clear setup state; provide a mock/demo provider only for development and label it as a demo, never as real image generation.
+- Include error handling for rate limits, network failure, provider outages, content-policy errors, and cost warnings. Do not claim AI generation is functional until a real provider integration has been tested.
+- Keep generated images as linked or embedded assets with an understandable license/provenance note where available.
+
+FEATURES NOT PRESENT IN COMPETITORS
+Suggest and implement genuinely useful differentiators only after the core editor is stable. Potential options include a print-preflight checklist, automatic bleed/safe-area checks, QR verification, dieline/fold-line separation, batch asset relinking, document health checks, reusable design presets, and a pre-export report. Do not promise every possible feature in version 1.0.0. Mark experimental functions clearly.
+
+ENGINEERING RULES
+- Follow the existing project's framework and conventions unless the audit justifies a change.
+- Keep modules maintainable, typed where practical, documented, and testable.
+- Use actively maintained dependencies and check their licenses, security advisories, and platform compatibility.
+- Avoid huge dependencies when a small library or native implementation is adequate.
+- Never remove working functionality merely to make the build pass.
+- Add automated unit/integration tests for geometry, generators, file import/export, and critical workflows.
+- Add a manual QA checklist for Linux desktop use.
+- Test keyboard/mouse interactions, high-DPI displays, file paths containing spaces/non-ASCII characters, and missing dependencies.
+- Provide clear error logs that avoid exposing API keys or private user content.
+- Document known limitations honestly.
+
+BUILD AND DELIVERY REQUIREMENTS
+The final deliverable must be a ZIP containing:
+- VEXORA-1.0.0-x86_64.AppImage (the actual built executable, not a placeholder or renamed original VectorCraft binary)
+- Complete source code and license notices, subject to the upstream license
+- README with installation, launch, troubleshooting, dependencies, and feature list
+- BUILDING.md with exact reproducible build commands and required system packages
+- build scripts and packaging configuration
+- tests and test results
+- CHANGELOG.md
+- THIRD_PARTY_NOTICES.md listing dependencies and licenses
+- app icon assets generated from the supplied VEXORA logo without redesigning it
+- sample editable documents/templates if useful
+
+Packaging rules:
+1. Target Linux x86_64 first. State the tested distribution and minimum requirements. Do not claim universal Linux compatibility without testing.
+2. Build a real AppImage using the project's appropriate packaging toolchain. Do not simply rename the existing VectorCraft AppImage to VEXORA.
+3. Run the app from the generated AppImage in a clean/test environment if available. Verify startup, icon/name, About information, save/open, export, and core workflows.
+4. Include checksums and file sizes in a release manifest.
+5. Package the AppImage and project files into a ZIP. Verify the ZIP opens and contains the expected files.
+6. If the environment cannot build or test an AppImage, do not fabricate one. Instead provide the complete source, exact build scripts, logs, and a clear explanation of the remaining build step. Continue trying a practical reproducible build path.
+7. Do not claim that the ZIP or AppImage is ready until it actually exists and has been verified.
+
+APPIMAGE SIZE / UPLOAD LIMIT STRATEGY
+Do not upload the 113 MB existing AppImage to the AI chat. Prefer these options in order:
+1. Retrieve/clone the exact upstream source repository and release tag, if repository access is available.
+2. If not, ask me to upload a source-code ZIP, not the AppImage. Exclude build outputs, node_modules/vendor caches, temporary files, and other regenerable dependencies unless required by the project.
+3. If only the AppImage is available, explain that it is a binary package and source inspection may be limited. Ask for the upstream repository URL; do not promise that uploading or extracting the binary will reveal complete source code.
+4. If you need information from the existing binary, ask me to run a small set of local diagnostic commands and share the text output. Do not ask me to paste a huge binary or upload it again.
+5. Keep generated release artifacts outside the source tree and compress the final deliverable. Do not strip required runtime libraries or assets merely to reduce size; report the real size and any trade-offs.
+
+WORK PLAN
+Stage 1: identify source/version/license, audit, baseline build, feature matrix.
+Stage 2: fix critical bugs and establish tests.
+Stage 3: improve core editor usability and visual design.
+Stage 4: implement die-line and fold-line tools, then QR/calendar generators.
+Stage 5: add AI-provider integration architecture and a real provider only when credentials and API requirements are available.
+Stage 6: complete About/version/icon branding and documentation.
+Stage 7: build, test, package AppImage and ZIP, verify outputs.
+
+For every stage, report: files changed, features implemented, exact commands run, test/build results, known limitations, and the next concrete step. Prefer a working, tested subset over a giant unfinished rewrite. Keep the project runnable throughout.
+
+FINAL ACCEPTANCE CHECKLIST
+- Application launches as VEXORA [by Grafio.].
+- VEXORA logo is used appropriately and as the application icon; Grafio logo appears small in About.
+- About includes: R.M.T.D Rajapaksha, Owner — Grafio., date 2026/10/26, version 1.0.0.
+- Existing project bugs have an audit trail and critical issues are fixed or documented.
+- Core vector workflows tested.
+- Die-line and fold-line tools create editable, separate, configurable lines and have tests or a documented manual QA result.
+- QR and calendar generators create editable output; QR output is verified by decoding.
+- AI generation has a real provider integration or is explicitly labelled “not configured”; no fake success messages.
+- Source, licenses, build instructions, tests, and release notes are included.
+- The ZIP contains a real VEXORA AppImage only if it was successfully built and verified.
+- Final report includes exact artifact paths, sizes, checksums, test results, and known limitations.
+
+Begin by inspecting the available files and confirming the upstream VectorCraft 0.13.1 source repository/license. Do not start by redesigning the UI before understanding the existing codebase.
